@@ -21,7 +21,9 @@ backend = set_backend("torch_cuda")
 # コマンドライン引数を設定
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--sub_id", type=int, required=True,
-                    choices=[57,58,61,62,63,64,65,67,68,69,70,72,73,74,75,76,77,78,79,81,82,83,84,86,87,88,89,91,92,93,94,95,96,97,98,99,100,101,103,104,105,106,108,109,110,113,114,115],
+                    choices=[18,22,23,24,28,30,31,35,36,37,38,39,41,42,43,44,45,46,47,48,49,50,51,52,53,
+                             57,58,61,62,63,64,65,67,68,69,70,72,73,74,75,76,77,78,79,81,82,83,84,86,87,
+                             88,89,91,92,93,94,95,96,97,98,99,100,101,103,104,105,106,108,109,110,113,114,115],
                     help="input subject id")
 parser.add_argument("-r", "--ridge_type", type=str,
                     choices=["Ridge","KernelRidge"],
@@ -134,49 +136,51 @@ def corr_graph(corr, range_min=-1.0, range_max=1.0, fig_name=""):
 
 # パスの設定
 sub_id = args.sub_id
-if sub_id < 100:
+if sub_id <= 53:
+    subject = "sub-"+str(sub_id)
+    section = 5
+elif sub_id < 100:
     subject = "sub_EN0"+str(sub_id)
+    section = 9
 else:
     subject = "sub_EN"+str(sub_id)
+    section = 9
 
-brain_path = "/home/sync/brain/pycortex_project/resource/littlePrince/" + subject + "/echo_1_cortex/normalization/"
-brain_files= []
-feature_files= []
+if sub_id <= 53:
+    brain_path = '/home/sync/brain/pycortex_project/resource/Alice/sub-' + str(sub_id) + "/normalization/split_5data_line_trilinear/"
+    brain_files= []
+    for i in range(5):
+    brain_files.append("sub-" + str(sub_id) + "_" + str(i+1) + ".npy")
 
-feature_path = '/home/sync/brain/src/encoding/LittlePrince/features/data/' # 特徴量の .npy を作成したら設定
-if mode == "without_concat":
-    feature_file_path = '/home/sync/brain/src/encoding/LittlePrince/features/data/features_emotion/'
-elif mode == "with_concat":
-    feature_file_path = '/home/sync/brain/src/encoding/LittlePrince/features/data/features_concated/'
-else:
-    feature_file_path = '/home/sync/brain/src/encoding/LittlePrince/features/data/features_bert-cased/'
+    feature_path = '/home/sync/brain/Alice/features/' # 特徴量の .npy を作成したら設定
+    if mode == "without_concat":
+        feature_file = 'emotion_features_365.npy'
+    elif mode == "with_concat":
+        feature_file = 'concat_features_365.npy'
+    else:
+        feature_file = 'emotion_features_365.npy'
 
-for i in range(9):
-    brain_files.append("run-" + str(i+1) + ".npy")
-    feature_files.append("features_section_" + str(i+1) + ".npy")
+    out_data_dir = '/home/sync/brain/model/'+ mode + "/" + ridge_type +'/encodingmodel_output_sub-' + str(sub_id)
+    os.mkdir(out_data_dir)
 
-out_data_dir = '/home/sync/brain/src/encoding/LittlePrince/model/'+ mode + "/" + ridge_type +'/encodingmodel_output_' + subject
-os.makedirs(out_data_dir, exist_ok=True)
+    # 特徴量の読み込み
+    cut_timing = [47,162,241,305]
+    # cut_timing = [43,77,115,155,191,229,260,297,334]
+    with open(feature_path + feature_file, 'rb') as f:
+        feature = np.load(f)
 
-# 脳活動データ・特徴量の読み込み
-for i in range(9):
-    for j in range(9):
-        with open(brain_path + brain_files[j], 'rb') as f:
-            brain_data = np.load(f)
-        with open(feature_file_path + feature_files[j], 'rb') as f:
-            feature_data = np.load(f)
-        if i!=0 and j==0: # リッジ回帰が1回目でなくて最初のファイルを読み込むとき
-            brain_trn = brain_data # 最初のファイルは訓練用として使う
-            feature_trn = feature_data
-        elif i==0 and j==1: # リッジ回帰が1回目で2つ目のファイルを読み込むとき
-            brain_trn = brain_data # 最初のファイルはテスト用になるので、2つ目のファイルを訓練用として登録
-            feature_trn = feature_data
-        elif j==i:
-            brain_test = brain_data
-            feature_test = feature_data
-        else:
-            brain_trn = np.vstack([brain_trn, brain_data])
-            feature_trn = np.vstack([feature_trn, feature_data])
+    for i in range(len(brain_files)):
+        for j in range(len(brain_files)):
+            with open(brain_path + brain_files[j], 'rb') as f:
+                data = np.load(f)
+            if i!=0 and j==0: # リッジ回帰が1回目でなくて最初のファイルを読み込むとき
+                brain_trn = data # 最初のファイルは訓練用として使う
+            elif i==0 and j==1: # リッジ回帰が1回目で2つ目のファイルを読み込むとき
+                brain_trn = data # 最初のファイルはテスト用になるので、2つ目のファイルを訓練用として登録
+            elif j==i:
+                brain_test = data
+            else:
+                brain_trn = np.vstack([brain_trn, data])
 
     # load_imge と形式を合わせる方法    
     print('brain_trn shape: ', brain_trn.shape) # (データ数・時間,脳活動データの次元・大脳皮質) 配列を取り出せれば形式はなんでも
@@ -184,9 +188,71 @@ for i in range(9):
 
     n_voxels = brain_trn.shape[1] # ボクセル数
     print('n_voxels: ', n_voxels)
+    
+    # 特徴量
+    if i==0:
+        feature_trn = feature[cut_timing[i]:]
+        feature_test = feature[:cut_timing[i]]
+    elif i == len(brain_files) - 1:
+        feature_trn = feature[:cut_timing[i-1]]
+        feature_test = feature[cut_timing[i-1]:]
+    else:
+        feature_trn = feature[:cut_timing[i-1]]
+        feature_trn = np.vstack([feature_trn,feature[cut_timing[i]:]])
+        feature_test = feature[cut_timing[i-1]:cut_timing[i]]
 
     print('feature_trn shape: ', feature_trn.shape) # (データ数、特徴量の次元)
     print('feature_test shape: ', feature_test.shape)
+    
+else:
+    brain_path = "/home/sync/brain/pycortex_project/resource/littlePrince/" + subject + "/echo_1_cortex/normalization/"
+    brain_files= []
+    feature_files= []
+    
+    feature_path = '/home/sync/brain/src/encoding/LittlePrince/features/data/' # 特徴量の .npy を作成したら設定
+    if mode == "without_concat":
+        feature_file_path = '/home/sync/brain/src/encoding/LittlePrince/features/data/features_emotion/'
+    elif mode == "with_concat":
+        feature_file_path = '/home/sync/brain/src/encoding/LittlePrince/features/data/features_concated/'
+    else:
+        feature_file_path = '/home/sync/brain/src/encoding/LittlePrince/features/data/features_bert-cased/'
+    
+    for i in range(9):
+        brain_files.append("run-" + str(i+1) + ".npy")
+        feature_files.append("features_section_" + str(i+1) + ".npy")
+    
+    out_data_dir = '/home/sync/brain/src/encoding/LittlePrince/model/'+ mode + "/" + ridge_type +'/encodingmodel_output_' + subject
+    os.makedirs(out_data_dir, exist_ok=True)
+    
+    # 脳活動データ・特徴量の読み込み
+    for i in range(9):
+        for j in range(9):
+            with open(brain_path + brain_files[j], 'rb') as f:
+                brain_data = np.load(f)
+            with open(feature_file_path + feature_files[j], 'rb') as f:
+                feature_data = np.load(f)
+            if i!=0 and j==0: # リッジ回帰が1回目でなくて最初のファイルを読み込むとき
+                brain_trn = brain_data # 最初のファイルは訓練用として使う
+                feature_trn = feature_data
+            elif i==0 and j==1: # リッジ回帰が1回目で2つ目のファイルを読み込むとき
+                brain_trn = brain_data # 最初のファイルはテスト用になるので、2つ目のファイルを訓練用として登録
+                feature_trn = feature_data
+            elif j==i:
+                brain_test = brain_data
+                feature_test = feature_data
+            else:
+                brain_trn = np.vstack([brain_trn, brain_data])
+                feature_trn = np.vstack([feature_trn, feature_data])
+    
+        # load_imge と形式を合わせる方法    
+        print('brain_trn shape: ', brain_trn.shape) # (データ数・時間,脳活動データの次元・大脳皮質) 配列を取り出せれば形式はなんでも
+        print('brain_test shape: ', brain_test.shape)
+    
+        n_voxels = brain_trn.shape[1] # ボクセル数
+        print('n_voxels: ', n_voxels)
+    
+        print('feature_trn shape: ', feature_trn.shape) # (データ数、特徴量の次元)
+        print('feature_test shape: ', feature_test.shape)
 
     width = 4
     delay = 2
@@ -199,7 +265,7 @@ for i in range(9):
 
     n_samples = feature_trn_paired.shape[0] # データ数
     chunklen = 25 # TR=2のデータなので、25くっつけたら50秒分くっつけたことになる
-    n_cv = 9 # 何fold cross-validationをするか
+    n_cv = section # 何fold cross-validationをするか
 
     cv_inds = get_cv_inds(n_samples, chunklen, n_cv)
 
