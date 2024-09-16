@@ -22,9 +22,7 @@
 各感情カテゴリーのみに関する予測脳活動の抽出: `extract_brain_activity_each_emotion.py`  
 ### 全被験者・男女別の平均予測脳活動
 全被験者の予測脳活動データをsub-22のflatmapへマッピング: `mapping_all_subject.py`  
-全被験者の平均予測脳活動: `get_all_subject_mean.py`  
-男性被験者の平均予測脳活動: `get_male_subject_mean.py`  
-女性被験者の平均予測脳活動: `get_female_subject_mean.py`  
+平均予測脳活動: `get_subject_mean.ipynb`  
 ## 関心領域別の各感情の反応強度調査
 1. 各感情のみに関する予測脳活動の全タイムスタンプの平均を取り(1xボクセルの行列)、スタックする: `extract_brain_activity_each_emotion.py`参照
 2. 各ROIでマスクをかけ (他のROIの列は全部値を0にする)、ROIごとの行列 (80xボクセル)を取り出す: `get_each_roi_matrix.py`
